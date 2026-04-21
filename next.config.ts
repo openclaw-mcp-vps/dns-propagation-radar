@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["ws", "node-cron"]
+  reactStrictMode: true
 };
 
 export default nextConfig;

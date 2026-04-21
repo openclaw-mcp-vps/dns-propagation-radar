@@ -1,222 +1,220 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { DnsMap } from "@/components/dns-map";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LoaderCircle, Radar, RefreshCcw } from "lucide-react";
+import { DNSMap } from "@/components/dns-map";
+import { NotificationSettings } from "@/components/notification-settings";
 import { ResolverStatus } from "@/components/resolver-status";
-import type { DnsCheckSession } from "@/lib/storage";
-
-type DnsCheckResponse = {
-  check: DnsCheckSession;
-  websocketHint?: string;
-};
-
-const RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"];
-
-function buildWsUrl(checkId: string, wsPortHint?: string) {
-  if (typeof window === "undefined") return "";
-  const url = new URL(window.location.href);
-  const protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  const port = wsPortHint ?? "3010";
-  return `${protocol}//${url.hostname}:${port}/?checkId=${checkId}`;
-}
+import { SUPPORTED_RECORD_TYPES, type DNSRecordType, type MonitorSnapshot } from "@/lib/types";
 
 export function DashboardClient() {
-  const [domain, setDomain] = useState("umami.microtool.dev");
-  const [recordType, setRecordType] = useState("A");
-  const [expectedValue, setExpectedValue] = useState("");
-  const [email, setEmail] = useState("");
-  const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
-  const [thresholdPercent, setThresholdPercent] = useState(95);
-  const [loading, setLoading] = useState(false);
+  const [domain, setDomain] = useState("");
+  const [recordType, setRecordType] = useState<DNSRecordType>("A");
+  const [targetValue, setTargetValue] = useState("");
+  const [monitorId, setMonitorId] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<MonitorSnapshot | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [check, setCheck] = useState<DnsCheckSession | null>(null);
-  const [wsPortHint, setWsPortHint] = useState<string | undefined>(undefined);
+  const [streamState, setStreamState] = useState<"idle" | "connected" | "reconnecting">("idle");
+
+  const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (!check?.id) return;
-
-    const socket = new WebSocket(buildWsUrl(check.id, wsPortHint));
-    socket.onmessage = (event) => {
-      const payload = JSON.parse(event.data) as { type: string; payload: DnsCheckSession };
-      if (payload.type === "check:update") {
-        setCheck(payload.payload);
-      }
-    };
-
-    const poll = setInterval(async () => {
-      const response = await fetch(`/api/dns-check?id=${check.id}`);
-      if (!response.ok) return;
-      const body = (await response.json()) as { check: DnsCheckSession };
-      setCheck(body.check);
-    }, 20000);
-
-    return () => {
-      clearInterval(poll);
-      socket.close();
-    };
-  }, [check?.id, wsPortHint]);
-
-  const startCheck = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const response = await fetch("/api/dns-check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        domain,
-        recordType,
-        expectedValue
-      })
-    });
-
-    const body = (await response.json()) as DnsCheckResponse & { error?: string };
-    setLoading(false);
-
-    if (!response.ok) {
-      setError(body.error ?? "Could not start DNS check.");
+    if (!monitorId) {
       return;
     }
 
-    setCheck(body.check);
-    setWsPortHint(body.websocketHint);
+    const source = new EventSource(`/api/events?monitorId=${encodeURIComponent(monitorId)}`);
+    sourceRef.current = source;
 
-    if (email || discordWebhookUrl) {
-      await fetch("/api/notifications", {
+    const consumeSnapshot = (event: MessageEvent<string>) => {
+      const parsed = JSON.parse(event.data) as MonitorSnapshot;
+      setSnapshot(parsed);
+    };
+
+    source.addEventListener("snapshot", consumeSnapshot as EventListener);
+    source.addEventListener("update", consumeSnapshot as EventListener);
+
+    source.onopen = () => {
+      setStreamState("connected");
+    };
+
+    source.onerror = () => {
+      setStreamState("reconnecting");
+    };
+
+    return () => {
+      source.close();
+      sourceRef.current = null;
+    };
+  }, [monitorId]);
+
+  useEffect(() => {
+    return () => {
+      sourceRef.current?.close();
+    };
+  }, []);
+
+  const statusBadge = useMemo(() => {
+    if (streamState === "connected") {
+      return "text-emerald-300 border-emerald-400/30 bg-emerald-500/10";
+    }
+
+    if (streamState === "reconnecting") {
+      return "text-amber-300 border-amber-400/30 bg-amber-500/10";
+    }
+
+    return "text-zinc-300 border-zinc-700 bg-zinc-900";
+  }, [streamState]);
+
+  async function startMonitoring(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/dns-check", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          checkId: body.check.id,
-          thresholdPercent,
-          email: email || undefined,
-          discordWebhookUrl: discordWebhookUrl || undefined
+          domain,
+          recordType,
+          targetValue: targetValue.trim() || undefined
         })
       });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        monitorId?: string;
+        snapshot?: MonitorSnapshot;
+      };
+
+      if (!response.ok || !payload.monitorId || !payload.snapshot) {
+        throw new Error(payload.error ?? "Unable to start DNS monitor.");
+      }
+
+      setMonitorId(payload.monitorId);
+      setSnapshot(payload.snapshot);
+      setStreamState("reconnecting");
+    } catch (monitorError) {
+      if (monitorError instanceof Error) {
+        setError(monitorError.message);
+      } else {
+        setError("Unexpected error while starting monitor.");
+      }
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }
 
-  const stats = useMemo(() => {
-    if (!check) return null;
+  async function refreshSnapshot() {
+    if (!monitorId) {
+      return;
+    }
 
-    const totals = {
-      match: 0,
-      mismatch: 0,
-      error: 0,
-      pending: 0
-    } as Record<DnsCheckSession["resolvers"][number]["status"], number>;
+    const response = await fetch(`/api/dns-check?monitorId=${encodeURIComponent(monitorId)}`);
+    const payload = (await response.json()) as { snapshot?: MonitorSnapshot };
 
-    for (const resolver of check.resolvers) totals[resolver.status] += 1;
-    return totals;
-  }, [check]);
+    if (response.ok && payload.snapshot) {
+      setSnapshot(payload.snapshot);
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <section className="panel p-5 md:p-6">
-        <h1 className="text-2xl font-semibold text-white">Live DNS Propagation Dashboard</h1>
-        <p className="mt-2 text-sm text-slate-300">
-          Start a check, then monitor global resolver convergence every 60 seconds.
-        </p>
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-50">
+              <Radar className="size-5 text-cyan-300" />
+              DNS Propagation Dashboard
+            </h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              Polling every 60 seconds across {snapshot?.totalResolvers ?? 40}+ resolvers.
+            </p>
+          </div>
+          <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusBadge}`}>
+            stream: {streamState}
+          </span>
+        </div>
 
-        <form onSubmit={startCheck} className="mt-5 grid gap-3 md:grid-cols-2">
-          <input
-            className="rounded-md border border-slate-700 bg-[#0d1117] px-3 py-2 text-sm text-white"
-            value={domain}
-            onChange={(event) => setDomain(event.target.value)}
-            placeholder="Domain (e.g. app.example.com)"
-            required
-          />
-          <input
-            className="rounded-md border border-slate-700 bg-[#0d1117] px-3 py-2 text-sm text-white"
-            value={expectedValue}
-            onChange={(event) => setExpectedValue(event.target.value)}
-            placeholder="Expected value (IP, CNAME, MX host...)"
-            required
-          />
-          <select
-            className="rounded-md border border-slate-700 bg-[#0d1117] px-3 py-2 text-sm text-white"
-            value={recordType}
-            onChange={(event) => setRecordType(event.target.value)}
-          >
-            {RECORD_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          <input
-            className="rounded-md border border-slate-700 bg-[#0d1117] px-3 py-2 text-sm text-white"
-            type="number"
-            min={1}
-            max={100}
-            value={thresholdPercent}
-            onChange={(event) => setThresholdPercent(Number(event.target.value))}
-            placeholder="Notification threshold %"
-          />
-          <input
-            className="rounded-md border border-slate-700 bg-[#0d1117] px-3 py-2 text-sm text-white"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="Alert email (optional)"
-            type="email"
-          />
-          <input
-            className="rounded-md border border-slate-700 bg-[#0d1117] px-3 py-2 text-sm text-white"
-            value={discordWebhookUrl}
-            onChange={(event) => setDiscordWebhookUrl(event.target.value)}
-            placeholder="Discord webhook URL (optional)"
-            type="url"
-          />
+        <form className="mt-5 grid gap-3 lg:grid-cols-[2fr_120px_2fr_auto]" onSubmit={startMonitoring}>
+          <label className="text-sm text-zinc-300">
+            Domain
+            <input
+              required
+              type="text"
+              value={domain}
+              onChange={(event) => setDomain(event.target.value)}
+              placeholder="example.com"
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-cyan-400/40 transition focus:ring"
+            />
+          </label>
+
+          <label className="text-sm text-zinc-300">
+            Record
+            <select
+              value={recordType}
+              onChange={(event) => setRecordType(event.target.value as DNSRecordType)}
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-cyan-400/40 transition focus:ring"
+            >
+              {SUPPORTED_RECORD_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm text-zinc-300">
+            Expected Value (optional)
+            <input
+              type="text"
+              value={targetValue}
+              onChange={(event) => setTargetValue(event.target.value)}
+              placeholder={recordType === "A" ? "76.76.21.21" : "new-target.example.net"}
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none ring-cyan-400/40 transition focus:ring"
+            />
+          </label>
+
           <button
             type="submit"
-            disabled={loading}
-            className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-emerald-400 disabled:opacity-50"
+            disabled={submitting}
+            className="mt-[23px] inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-400 px-4 text-sm font-semibold text-slate-900 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Starting..." : "Start 40-Resolver Check"}
+            {submitting ? <LoaderCircle className="size-4 animate-spin" /> : null}
+            Start
           </button>
         </form>
-        {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <button
+            type="button"
+            onClick={refreshSnapshot}
+            disabled={!monitorId}
+            className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-3 py-2 text-zinc-200 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCcw className="size-3.5" />
+            Refresh Snapshot
+          </button>
+
+          {error ? <p className="text-rose-300">{error}</p> : null}
+        </div>
       </section>
 
-      {check ? (
+      {snapshot ? (
         <>
-          <section className="panel p-5 md:p-6">
-            <div className="grid gap-3 md:grid-cols-5">
-              <div>
-                <p className="text-xs uppercase text-slate-400">Domain</p>
-                <p className="mt-1 text-sm text-white">{check.domain}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-400">Record Type</p>
-                <p className="mt-1 text-sm text-white">{check.recordType}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-400">Expected Value</p>
-                <p className="mt-1 text-sm text-white">{check.expectedValue}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-400">Propagation</p>
-                <p className="mt-1 text-sm font-semibold text-emerald-300">{check.propagationPercent.toFixed(1)}%</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-400">Last Run</p>
-                <p className="mt-1 text-sm text-white">{check.lastRunAt ? new Date(check.lastRunAt).toLocaleTimeString() : "Pending"}</p>
-              </div>
-            </div>
-            {stats ? (
-              <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                <span className="badge border-emerald-500/40 text-emerald-300">Match: {stats.match}</span>
-                <span className="badge border-amber-500/40 text-amber-300">Mismatch: {stats.mismatch}</span>
-                <span className="badge border-red-500/40 text-red-300">Error: {stats.error}</span>
-                <span className="badge">Pending: {stats.pending}</span>
-              </div>
-            ) : null}
-          </section>
-
-          <DnsMap resolvers={check.resolvers} />
-          <ResolverStatus resolvers={check.resolvers} />
+          <DNSMap results={snapshot.results} />
+          <ResolverStatus snapshot={snapshot} />
+          <NotificationSettings monitorId={snapshot.id} />
         </>
-      ) : null}
+      ) : (
+        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-8 text-center text-zinc-300">
+          Start a monitor to stream resolver responses and propagation history.
+        </section>
+      )}
     </div>
   );
 }

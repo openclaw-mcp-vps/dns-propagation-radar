@@ -1,55 +1,48 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
-import { verifyLemonSqueezySignature } from "@/lib/lemonsqueezy";
-import { addPaidEmail } from "@/lib/storage";
+import { NextRequest, NextResponse } from "next/server";
+import { addPurchase } from "@/lib/database";
+import {
+  extractCheckoutEmail,
+  extractCheckoutReference,
+  verifyStripeSignature,
+  type GenericWebhookEvent
+} from "@/lib/lemonsqueezy";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const webhookSchema = z.object({
-  meta: z
-    .object({
-      event_name: z.string().optional()
-    })
-    .optional(),
-  data: z
-    .object({
-      attributes: z
-        .object({
-          user_email: z.string().email().optional(),
-          customer_email: z.string().email().optional()
-        })
-        .optional()
-    })
-    .optional()
-});
+export async function POST(request: NextRequest) {
+  const payload = await request.text();
+  const signatureHeader = request.headers.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-export async function POST(request: Request) {
-  const rawBody = await request.text();
-  const signature = request.headers.get("x-signature");
+  const validSignature = verifyStripeSignature({
+    payload,
+    signatureHeader,
+    secret: webhookSecret
+  });
 
-  if (!verifyLemonSqueezySignature(rawBody, signature)) {
-    return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
+  if (!validSignature) {
+    return NextResponse.json({ error: "Invalid Stripe signature" }, { status: 400 });
   }
 
-  let payload: unknown;
+  let event: GenericWebhookEvent;
+
   try {
-    payload = JSON.parse(rawBody);
+    event = JSON.parse(payload) as GenericWebhookEvent;
   } catch {
     return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const parsed = webhookSchema.safeParse(payload);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
-  }
+  if (event.type === "checkout.session.completed") {
+    const email = extractCheckoutEmail(event);
+    const reference = extractCheckoutReference(event);
 
-  const email =
-    parsed.data.data?.attributes?.user_email ??
-    parsed.data.data?.attributes?.customer_email ??
-    null;
-
-  if (email) {
-    await addPaidEmail(email.toLowerCase());
+    if (email && reference) {
+      await addPurchase({
+        email,
+        providerReference: reference
+      });
+    }
   }
 
   return NextResponse.json({ received: true });

@@ -1,68 +1,83 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 import {
-  createCheckSession,
-  ensureDnsScheduler,
-  isValidRecordType,
-  runCheckOnce
+  getMonitorSnapshot,
+  isSupportedRecordType,
+  isValidDomain,
+  normalizeDomainInput,
+  startMonitor
 } from "@/lib/dns-poller";
-import { getCheck, listChecks, upsertCheck } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const createSchema = z.object({
-  domain: z.string().min(3).max(255),
-  recordType: z.string(),
-  expectedValue: z.string().min(1).max(512)
-});
-
-export async function GET(request: Request) {
-  ensureDnsScheduler();
-
-  const { searchParams } = new URL(request.url);
-  const checkId = searchParams.get("id");
-
-  if (checkId) {
-    const check = await getCheck(checkId);
-    if (!check) return NextResponse.json({ error: "Check not found" }, { status: 404 });
-    return NextResponse.json({ check });
-  }
-
-  const checks = await listChecks(15);
-  return NextResponse.json({ checks });
+async function ensurePaidAccess() {
+  const cookieStore = await cookies();
+  return cookieStore.get("dpr_access")?.value === "paid";
 }
 
-export async function POST(request: Request) {
-  ensureDnsScheduler();
-
-  const body = await request.json();
-  const parsed = createSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+export async function POST(request: NextRequest) {
+  if (!(await ensurePaidAccess())) {
+    return NextResponse.json({ error: "Paid access required." }, { status: 402 });
   }
 
-  const recordType = parsed.data.recordType.toUpperCase();
-  if (!isValidRecordType(recordType)) {
-    return NextResponse.json({ error: "Unsupported record type" }, { status: 400 });
+  let body: {
+    domain?: string;
+    recordType?: string;
+    targetValue?: string;
+  };
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const session = createCheckSession({
-    domain: parsed.data.domain.toLowerCase().trim(),
+  const domain = normalizeDomainInput(body.domain ?? "");
+  const recordType = (body.recordType ?? "A").toUpperCase();
+
+  if (!isValidDomain(domain)) {
+    return NextResponse.json(
+      { error: "Enter a valid domain, for example: example.com" },
+      { status: 400 }
+    );
+  }
+
+  if (!isSupportedRecordType(recordType)) {
+    return NextResponse.json(
+      { error: "Unsupported record type. Use A, AAAA, CNAME, TXT, MX, or NS." },
+      { status: 400 }
+    );
+  }
+
+  const snapshot = await startMonitor({
+    domain,
     recordType,
-    expectedValue: parsed.data.expectedValue.trim()
+    targetValue: body.targetValue ?? null
   });
-
-  await upsertCheck(session);
-  runCheckOnce(session.id).catch(() => {
-    // Keep API fast and return session immediately.
-  });
-
-  const wsPort = process.env.WS_PORT ?? "3010";
 
   return NextResponse.json({
-    check: session,
-    websocketHint: wsPort
+    monitorId: snapshot.id,
+    snapshot
   });
+}
+
+export async function GET(request: NextRequest) {
+  if (!(await ensurePaidAccess())) {
+    return NextResponse.json({ error: "Paid access required." }, { status: 402 });
+  }
+
+  const monitorId = request.nextUrl.searchParams.get("monitorId");
+
+  if (!monitorId) {
+    return NextResponse.json({ error: "monitorId is required" }, { status: 400 });
+  }
+
+  const snapshot = await getMonitorSnapshot(monitorId);
+
+  if (!snapshot) {
+    return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ snapshot });
 }
