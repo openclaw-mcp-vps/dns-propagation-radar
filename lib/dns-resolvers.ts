@@ -1,312 +1,55 @@
-import { DNSResolverDefinition } from "@/lib/types";
+import { ResolverDefinition } from "@/types/dns";
 
-export const DNS_RESOLVERS: DNSResolverDefinition[] = [
-  {
-    id: "google-primary",
-    name: "Google Public DNS #1",
-    provider: "Google",
-    ip: "8.8.8.8",
-    location: { lat: 37.7749, lng: -122.4194, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "google-secondary",
-    name: "Google Public DNS #2",
-    provider: "Google",
-    ip: "8.8.4.4",
-    location: { lat: 40.7128, lng: -74.006, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "cloudflare-primary",
-    name: "Cloudflare DNS #1",
-    provider: "Cloudflare",
-    ip: "1.1.1.1",
-    location: { lat: -33.8688, lng: 151.2093, region: "Oceania", countryCode: "AU" }
-  },
-  {
-    id: "cloudflare-secondary",
-    name: "Cloudflare DNS #2",
-    provider: "Cloudflare",
-    ip: "1.0.0.1",
-    location: { lat: 51.5072, lng: -0.1276, region: "Europe", countryCode: "GB" }
-  },
-  {
-    id: "quad9-primary",
-    name: "Quad9 #1",
-    provider: "Quad9",
-    ip: "9.9.9.9",
-    location: { lat: 47.3769, lng: 8.5417, region: "Europe", countryCode: "CH" }
-  },
-  {
-    id: "quad9-secondary",
-    name: "Quad9 #2",
-    provider: "Quad9",
-    ip: "149.112.112.112",
-    location: { lat: 41.8781, lng: -87.6298, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "opendns-primary",
-    name: "OpenDNS #1",
-    provider: "Cisco OpenDNS",
-    ip: "208.67.222.222",
-    location: { lat: 37.3382, lng: -121.8863, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "opendns-secondary",
-    name: "OpenDNS #2",
-    provider: "Cisco OpenDNS",
-    ip: "208.67.220.220",
-    location: { lat: 45.5152, lng: -122.6784, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "adguard-primary",
-    name: "AdGuard DNS #1",
-    provider: "AdGuard",
-    ip: "94.140.14.14",
-    location: { lat: 35.1264, lng: 33.4299, region: "Europe", countryCode: "CY" }
-  },
-  {
-    id: "adguard-secondary",
-    name: "AdGuard DNS #2",
-    provider: "AdGuard",
-    ip: "94.140.15.15",
-    location: { lat: 52.52, lng: 13.405, region: "Europe", countryCode: "DE" }
-  },
-  {
-    id: "cleanbrowsing-primary",
-    name: "CleanBrowsing #1",
-    provider: "CleanBrowsing",
-    ip: "185.228.168.9",
-    location: { lat: 52.3676, lng: 4.9041, region: "Europe", countryCode: "NL" }
-  },
-  {
-    id: "cleanbrowsing-secondary",
-    name: "CleanBrowsing #2",
-    provider: "CleanBrowsing",
-    ip: "185.228.169.9",
-    location: { lat: 48.8566, lng: 2.3522, region: "Europe", countryCode: "FR" }
-  },
-  {
-    id: "controld-primary",
-    name: "Control D #1",
-    provider: "Control D",
-    ip: "76.76.2.0",
-    location: { lat: 43.6532, lng: -79.3832, region: "North America", countryCode: "CA" }
-  },
-  {
-    id: "controld-secondary",
-    name: "Control D #2",
-    provider: "Control D",
-    ip: "76.76.10.0",
-    location: { lat: 49.2827, lng: -123.1207, region: "North America", countryCode: "CA" }
-  },
-  {
-    id: "neustar-primary",
-    name: "Neustar #1",
-    provider: "Neustar UltraDNS",
-    ip: "64.6.64.6",
-    location: { lat: 39.9526, lng: -75.1652, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "neustar-secondary",
-    name: "Neustar #2",
-    provider: "Neustar UltraDNS",
-    ip: "64.6.65.6",
-    location: { lat: 33.749, lng: -84.388, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "comodo-primary",
-    name: "Comodo Secure DNS #1",
-    provider: "Comodo",
-    ip: "8.26.56.26",
-    location: { lat: 25.7617, lng: -80.1918, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "comodo-secondary",
-    name: "Comodo Secure DNS #2",
-    provider: "Comodo",
-    ip: "8.20.247.20",
-    location: { lat: 32.7767, lng: -96.797, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "level3-1",
-    name: "Level3 #1",
-    provider: "Level3",
-    ip: "4.2.2.1",
-    location: { lat: 42.3601, lng: -71.0589, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "level3-2",
-    name: "Level3 #2",
-    provider: "Level3",
-    ip: "4.2.2.2",
-    location: { lat: 39.7392, lng: -104.9903, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "level3-3",
-    name: "Level3 #3",
-    provider: "Level3",
-    ip: "4.2.2.3",
-    location: { lat: 29.7604, lng: -95.3698, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "level3-4",
-    name: "Level3 #4",
-    provider: "Level3",
-    ip: "4.2.2.4",
-    location: { lat: 34.0522, lng: -118.2437, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "level3-5",
-    name: "Level3 #5",
-    provider: "Level3",
-    ip: "4.2.2.5",
-    location: { lat: 47.6062, lng: -122.3321, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "level3-6",
-    name: "Level3 #6",
-    provider: "Level3",
-    ip: "4.2.2.6",
-    location: { lat: 41.2565, lng: -95.9345, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "he-net",
-    name: "Hurricane Electric",
-    provider: "Hurricane Electric",
-    ip: "74.82.42.42",
-    location: { lat: 37.3387, lng: -121.8853, region: "North America", countryCode: "US" }
-  },
-  {
-    id: "safedns-primary",
-    name: "SafeDNS #1",
-    provider: "SafeDNS",
-    ip: "195.46.39.39",
-    location: { lat: 50.1109, lng: 8.6821, region: "Europe", countryCode: "DE" }
-  },
-  {
-    id: "safedns-secondary",
-    name: "SafeDNS #2",
-    provider: "SafeDNS",
-    ip: "195.46.39.40",
-    location: { lat: 59.3293, lng: 18.0686, region: "Europe", countryCode: "SE" }
-  },
-  {
-    id: "uncensoreddns-primary",
-    name: "UncensoredDNS #1",
-    provider: "UncensoredDNS",
-    ip: "91.239.100.100",
-    location: { lat: 55.6761, lng: 12.5683, region: "Europe", countryCode: "DK" }
-  },
-  {
-    id: "uncensoreddns-secondary",
-    name: "UncensoredDNS #2",
-    provider: "UncensoredDNS",
-    ip: "89.233.43.71",
-    location: { lat: 56.1629, lng: 10.2039, region: "Europe", countryCode: "DK" }
-  },
-  {
-    id: "yandex-primary",
-    name: "Yandex DNS #1",
-    provider: "Yandex",
-    ip: "77.88.8.8",
-    location: { lat: 55.7558, lng: 37.6173, region: "Europe", countryCode: "RU" }
-  },
-  {
-    id: "yandex-secondary",
-    name: "Yandex DNS #2",
-    provider: "Yandex",
-    ip: "77.88.8.1",
-    location: { lat: 59.9343, lng: 30.3351, region: "Europe", countryCode: "RU" }
-  },
-  {
-    id: "alidns-primary",
-    name: "AliDNS #1",
-    provider: "Alibaba",
-    ip: "223.5.5.5",
-    location: { lat: 31.2304, lng: 121.4737, region: "Asia", countryCode: "CN" }
-  },
-  {
-    id: "alidns-secondary",
-    name: "AliDNS #2",
-    provider: "Alibaba",
-    ip: "223.6.6.6",
-    location: { lat: 39.9042, lng: 116.4074, region: "Asia", countryCode: "CN" }
-  },
-  {
-    id: "dnspod-primary",
-    name: "DNSPod",
-    provider: "DNSPod",
-    ip: "119.29.29.29",
-    location: { lat: 22.5431, lng: 114.0579, region: "Asia", countryCode: "CN" }
-  },
-  {
-    id: "baidu-public",
-    name: "Baidu DNS",
-    provider: "Baidu",
-    ip: "180.76.76.76",
-    location: { lat: 30.5728, lng: 104.0668, region: "Asia", countryCode: "CN" }
-  },
-  {
-    id: "dns114-primary",
-    name: "114DNS #1",
-    provider: "114DNS",
-    ip: "114.114.114.114",
-    location: { lat: 32.0603, lng: 118.7969, region: "Asia", countryCode: "CN" }
-  },
-  {
-    id: "dns114-secondary",
-    name: "114DNS #2",
-    provider: "114DNS",
-    ip: "114.114.115.115",
-    location: { lat: 23.1291, lng: 113.2644, region: "Asia", countryCode: "CN" }
-  },
-  {
-    id: "dnssb-primary",
-    name: "DNS.SB #1",
-    provider: "DNS.SB",
-    ip: "185.222.222.222",
-    location: { lat: 1.3521, lng: 103.8198, region: "Asia", countryCode: "SG" }
-  },
-  {
-    id: "dnssb-secondary",
-    name: "DNS.SB #2",
-    provider: "DNS.SB",
-    ip: "45.11.45.11",
-    location: { lat: 22.3193, lng: 114.1694, region: "Asia", countryCode: "HK" }
-  },
-  {
-    id: "iij-japan",
-    name: "IIJ Public DNS",
-    provider: "IIJ",
-    ip: "202.232.2.100",
-    location: { lat: 35.6762, lng: 139.6503, region: "Asia", countryCode: "JP" }
-  },
-  {
-    id: "kornet-korea",
-    name: "KT olleh DNS",
-    provider: "KT",
-    ip: "168.126.63.1",
-    location: { lat: 37.5665, lng: 126.978, region: "Asia", countryCode: "KR" }
-  },
-  {
-    id: "telecom-argentina",
-    name: "Telecom Argentina DNS",
-    provider: "Telecom Argentina",
-    ip: "200.51.211.7",
-    location: { lat: -34.6037, lng: -58.3816, region: "South America", countryCode: "AR" }
-  },
-  {
-    id: "oi-brasil",
-    name: "Oi Brasil DNS",
-    provider: "Oi",
-    ip: "200.221.11.100",
-    location: { lat: -22.9068, lng: -43.1729, region: "South America", countryCode: "BR" }
-  },
-  {
-    id: "telmex-mexico",
-    name: "Telmex DNS",
-    provider: "Telmex",
-    ip: "200.23.240.34",
-    location: { lat: 19.4326, lng: -99.1332, region: "North America", countryCode: "MX" }
-  }
+export const GLOBAL_DNS_RESOLVERS: ResolverDefinition[] = [
+  { id: "google-us-1", name: "Google DNS", ip: "8.8.8.8", city: "Ashburn", country: "United States", countryCode: "US", lat: 39.0438, lon: -77.4874, region: "NA" },
+  { id: "google-us-2", name: "Google DNS", ip: "8.8.4.4", city: "Mountain View", country: "United States", countryCode: "US", lat: 37.3861, lon: -122.0839, region: "NA" },
+  { id: "cloudflare-us-1", name: "Cloudflare", ip: "1.1.1.1", city: "San Jose", country: "United States", countryCode: "US", lat: 37.3382, lon: -121.8863, region: "NA" },
+  { id: "cloudflare-us-2", name: "Cloudflare", ip: "1.0.0.1", city: "Seattle", country: "United States", countryCode: "US", lat: 47.6062, lon: -122.3321, region: "NA" },
+  { id: "quad9-us-1", name: "Quad9", ip: "9.9.9.9", city: "New York", country: "United States", countryCode: "US", lat: 40.7128, lon: -74.006, region: "NA" },
+  { id: "quad9-us-2", name: "Quad9", ip: "149.112.112.112", city: "Chicago", country: "United States", countryCode: "US", lat: 41.8781, lon: -87.6298, region: "NA" },
+  { id: "opendns-us-1", name: "OpenDNS", ip: "208.67.222.222", city: "Dallas", country: "United States", countryCode: "US", lat: 32.7767, lon: -96.797, region: "NA" },
+  { id: "opendns-us-2", name: "OpenDNS", ip: "208.67.220.220", city: "Atlanta", country: "United States", countryCode: "US", lat: 33.749, lon: -84.388, region: "NA" },
+  { id: "adguard-eu-1", name: "AdGuard DNS", ip: "94.140.14.14", city: "Frankfurt", country: "Germany", countryCode: "DE", lat: 50.1109, lon: 8.6821, region: "EU" },
+  { id: "adguard-eu-2", name: "AdGuard DNS", ip: "94.140.15.15", city: "Amsterdam", country: "Netherlands", countryCode: "NL", lat: 52.3676, lon: 4.9041, region: "EU" },
+  { id: "cleanbrowsing-eu-1", name: "CleanBrowsing", ip: "185.228.168.9", city: "Dublin", country: "Ireland", countryCode: "IE", lat: 53.3498, lon: -6.2603, region: "EU" },
+  { id: "cleanbrowsing-eu-2", name: "CleanBrowsing", ip: "185.228.169.9", city: "London", country: "United Kingdom", countryCode: "GB", lat: 51.5072, lon: -0.1276, region: "EU" },
+  { id: "verisign-na-1", name: "Verisign Public DNS", ip: "64.6.64.6", city: "Reston", country: "United States", countryCode: "US", lat: 38.9586, lon: -77.357, region: "NA" },
+  { id: "verisign-na-2", name: "Verisign Public DNS", ip: "64.6.65.6", city: "Los Angeles", country: "United States", countryCode: "US", lat: 34.0522, lon: -118.2437, region: "NA" },
+  { id: "yandex-eu-1", name: "Yandex DNS", ip: "77.88.8.8", city: "Moscow", country: "Russia", countryCode: "RU", lat: 55.7558, lon: 37.6173, region: "EU" },
+  { id: "yandex-eu-2", name: "Yandex DNS", ip: "77.88.8.1", city: "Saint Petersburg", country: "Russia", countryCode: "RU", lat: 59.9343, lon: 30.3351, region: "EU" },
+  { id: "dnswatch-eu-1", name: "DNS.WATCH", ip: "84.200.69.80", city: "Berlin", country: "Germany", countryCode: "DE", lat: 52.52, lon: 13.405, region: "EU" },
+  { id: "dnswatch-eu-2", name: "DNS.WATCH", ip: "84.200.70.40", city: "Vienna", country: "Austria", countryCode: "AT", lat: 48.2082, lon: 16.3738, region: "EU" },
+  { id: "level3-na-1", name: "Lumen DNS", ip: "4.2.2.1", city: "Denver", country: "United States", countryCode: "US", lat: 39.7392, lon: -104.9903, region: "NA" },
+  { id: "level3-na-2", name: "Lumen DNS", ip: "4.2.2.2", city: "Phoenix", country: "United States", countryCode: "US", lat: 33.4484, lon: -112.074, region: "NA" },
+  { id: "level3-na-3", name: "Lumen DNS", ip: "4.2.2.3", city: "Miami", country: "United States", countryCode: "US", lat: 25.7617, lon: -80.1918, region: "NA" },
+  { id: "level3-na-4", name: "Lumen DNS", ip: "4.2.2.4", city: "Toronto", country: "Canada", countryCode: "CA", lat: 43.6532, lon: -79.3832, region: "NA" },
+  { id: "level3-na-5", name: "Lumen DNS", ip: "4.2.2.5", city: "Montreal", country: "Canada", countryCode: "CA", lat: 45.5017, lon: -73.5673, region: "NA" },
+  { id: "level3-na-6", name: "Lumen DNS", ip: "4.2.2.6", city: "Vancouver", country: "Canada", countryCode: "CA", lat: 49.2827, lon: -123.1207, region: "NA" },
+  { id: "neustar-na-1", name: "Neustar DNS", ip: "156.154.70.1", city: "Las Vegas", country: "United States", countryCode: "US", lat: 36.1699, lon: -115.1398, region: "NA" },
+  { id: "neustar-na-2", name: "Neustar DNS", ip: "156.154.71.1", city: "Austin", country: "United States", countryCode: "US", lat: 30.2672, lon: -97.7431, region: "NA" },
+  { id: "safedns-eu-1", name: "SafeDNS", ip: "195.46.39.39", city: "Paris", country: "France", countryCode: "FR", lat: 48.8566, lon: 2.3522, region: "EU" },
+  { id: "safedns-eu-2", name: "SafeDNS", ip: "195.46.39.40", city: "Madrid", country: "Spain", countryCode: "ES", lat: 40.4168, lon: -3.7038, region: "EU" },
+  { id: "freenom-eu-1", name: "Freenom World", ip: "80.80.80.80", city: "Zurich", country: "Switzerland", countryCode: "CH", lat: 47.3769, lon: 8.5417, region: "EU" },
+  { id: "freenom-eu-2", name: "Freenom World", ip: "80.80.81.81", city: "Milan", country: "Italy", countryCode: "IT", lat: 45.4642, lon: 9.19, region: "EU" },
+  { id: "publicdns-au-1", name: "AU Public DNS", ip: "139.130.4.5", city: "Sydney", country: "Australia", countryCode: "AU", lat: -33.8688, lon: 151.2093, region: "AP" },
+  { id: "publicdns-au-2", name: "AU Public DNS", ip: "139.130.4.4", city: "Melbourne", country: "Australia", countryCode: "AU", lat: -37.8136, lon: 144.9631, region: "AP" },
+  { id: "iiNet-au", name: "iiNet DNS", ip: "203.215.29.191", city: "Perth", country: "Australia", countryCode: "AU", lat: -31.9505, lon: 115.8605, region: "AP" },
+  { id: "vodafone-in", name: "Vodafone India", ip: "203.94.227.70", city: "Mumbai", country: "India", countryCode: "IN", lat: 19.076, lon: 72.8777, region: "AP" },
+  { id: "kt-kr", name: "KT DNS", ip: "168.126.63.1", city: "Seoul", country: "South Korea", countryCode: "KR", lat: 37.5665, lon: 126.978, region: "AP" },
+  { id: "china114", name: "114 DNS", ip: "114.114.114.114", city: "Shanghai", country: "China", countryCode: "CN", lat: 31.2304, lon: 121.4737, region: "AP" },
+  { id: "china114-b", name: "114 DNS", ip: "114.114.115.115", city: "Beijing", country: "China", countryCode: "CN", lat: 39.9042, lon: 116.4074, region: "AP" },
+  { id: "jio-in", name: "Jio DNS", ip: "49.45.0.1", city: "Delhi", country: "India", countryCode: "IN", lat: 28.6139, lon: 77.209, region: "AP" },
+  { id: "telefonica-br", name: "Telefonica DNS", ip: "200.204.0.10", city: "Sao Paulo", country: "Brazil", countryCode: "BR", lat: -23.5505, lon: -46.6333, region: "SA" },
+  { id: "oi-br", name: "Oi DNS", ip: "200.222.222.222", city: "Rio de Janeiro", country: "Brazil", countryCode: "BR", lat: -22.9068, lon: -43.1729, region: "SA" },
+  { id: "claro-ar", name: "Claro DNS", ip: "200.81.176.2", city: "Buenos Aires", country: "Argentina", countryCode: "AR", lat: -34.6037, lon: -58.3816, region: "SA" },
+  { id: "entel-cl", name: "Entel DNS", ip: "200.72.128.5", city: "Santiago", country: "Chile", countryCode: "CL", lat: -33.4489, lon: -70.6693, region: "SA" },
+  { id: "liquid-za", name: "Liquid Telecom DNS", ip: "196.46.70.42", city: "Johannesburg", country: "South Africa", countryCode: "ZA", lat: -26.2041, lon: 28.0473, region: "AF" },
+  { id: "safaricom-ke", name: "Safaricom DNS", ip: "196.201.214.11", city: "Nairobi", country: "Kenya", countryCode: "KE", lat: -1.2921, lon: 36.8219, region: "AF" },
+  { id: "etisalat-ae", name: "Etisalat DNS", ip: "195.229.241.222", city: "Dubai", country: "UAE", countryCode: "AE", lat: 25.2048, lon: 55.2708, region: "ME" },
+  { id: "stc-sa", name: "STC DNS", ip: "212.26.18.3", city: "Riyadh", country: "Saudi Arabia", countryCode: "SA", lat: 24.7136, lon: 46.6753, region: "ME" }
 ];
+
+export const DEFAULT_MONITOR_INTERVAL_SECONDS = 60;
+export const DEFAULT_THRESHOLD_PERCENTAGE = 95;
+
+export const SUPPORTED_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"] as const;

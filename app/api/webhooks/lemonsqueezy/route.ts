@@ -1,49 +1,60 @@
-import { NextRequest, NextResponse } from "next/server";
-import { addPurchase } from "@/lib/database";
+import { NextResponse } from "next/server";
+import { addAccessGrant } from "@/lib/database";
 import {
-  extractCheckoutEmail,
-  extractCheckoutReference,
-  verifyStripeSignature,
-  type GenericWebhookEvent
+  parseCheckoutEmail,
+  parseStripeEvent,
+  verifyStripeWebhookSignature
 } from "@/lib/lemonsqueezy";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
-  const payload = await request.text();
-  const signatureHeader = request.headers.get("stripe-signature");
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  const validSignature = verifyStripeSignature({
-    payload,
-    signatureHeader,
-    secret: webhookSecret
-  });
-
-  if (!validSignature) {
-    return NextResponse.json({ error: "Invalid Stripe signature" }, { status: 400 });
-  }
-
-  let event: GenericWebhookEvent;
+export async function POST(request: Request) {
+  const rawBody = await request.text();
 
   try {
-    event = JSON.parse(payload) as GenericWebhookEvent;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-  }
+    const signatureHeader = request.headers.get("stripe-signature");
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (event.type === "checkout.session.completed") {
-    const email = extractCheckoutEmail(event);
-    const reference = extractCheckoutReference(event);
+    if (secret) {
+      if (!signatureHeader) {
+        return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+      }
 
-    if (email && reference) {
-      await addPurchase({
+      const valid = verifyStripeWebhookSignature(rawBody, signatureHeader, secret);
+      if (!valid) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      }
+    }
+
+    const event = parseStripeEvent(rawBody);
+
+    if (event.type === "checkout.session.completed") {
+      const email = parseCheckoutEmail(event);
+      if (!email) {
+        return NextResponse.json({ error: "No customer email in checkout session" }, { status: 400 });
+      }
+
+      await addAccessGrant({
         email,
-        providerReference: reference
+        grantedAt: new Date().toISOString(),
+        source: "stripe-webhook",
+        reference: event.id
       });
     }
-  }
 
-  return NextResponse.json({ received: true });
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Webhook processing failed" },
+      { status: 400 }
+    );
+  }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    description:
+      "Send Stripe checkout.session.completed events here to grant dashboard access by billing email."
+  });
 }

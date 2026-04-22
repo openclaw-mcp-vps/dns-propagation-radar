@@ -1,156 +1,120 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { promises as fs } from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
-import type {
-  MonitorSnapshot,
-  NotificationSubscription,
-  PersistedDatabase,
-  PurchaseRecord
-} from "@/lib/types";
+import { AccessGrant, DatabaseShape, DnsMonitor } from "@/types/dns";
 
-const DATA_DIRECTORY = path.join(process.cwd(), ".data");
-const DATABASE_FILE = path.join(DATA_DIRECTORY, "database.json");
+const DATA_DIR = path.join(process.cwd(), ".data");
+const DB_FILE = path.join(DATA_DIR, "database.json");
 
-const EMPTY_DATABASE: PersistedDatabase = {
-  purchases: [],
-  subscriptions: [],
-  snapshots: {}
+const defaultData: DatabaseShape = {
+  monitors: [],
+  accessGrants: []
 };
 
-let writeChain = Promise.resolve();
+let writeQueue: Promise<void> = Promise.resolve();
 
 async function ensureDatabaseFile() {
-  await mkdir(DATA_DIRECTORY, { recursive: true });
-
+  await fs.mkdir(DATA_DIR, { recursive: true });
   try {
-    await readFile(DATABASE_FILE, "utf8");
+    await fs.access(DB_FILE);
   } catch {
-    await writeFile(DATABASE_FILE, JSON.stringify(EMPTY_DATABASE, null, 2), "utf8");
+    await fs.writeFile(DB_FILE, JSON.stringify(defaultData, null, 2), "utf8");
   }
 }
 
-async function readDatabase(): Promise<PersistedDatabase> {
+export async function readDatabase(): Promise<DatabaseShape> {
   await ensureDatabaseFile();
-  const raw = await readFile(DATABASE_FILE, "utf8");
-  const parsed = JSON.parse(raw) as Partial<PersistedDatabase>;
-
-  return {
-    purchases: parsed.purchases ?? [],
-    subscriptions: parsed.subscriptions ?? [],
-    snapshots: parsed.snapshots ?? {}
-  };
+  const raw = await fs.readFile(DB_FILE, "utf8");
+  try {
+    const parsed = JSON.parse(raw) as DatabaseShape;
+    return {
+      monitors: Array.isArray(parsed.monitors) ? parsed.monitors : [],
+      accessGrants: Array.isArray(parsed.accessGrants) ? parsed.accessGrants : []
+    };
+  } catch {
+    return defaultData;
+  }
 }
 
-async function writeDatabase(data: PersistedDatabase) {
-  await writeFile(DATABASE_FILE, JSON.stringify(data, null, 2), "utf8");
-}
-
-async function queueWrite<T>(operation: (db: PersistedDatabase) => Promise<T> | T): Promise<T> {
-  const task = writeChain.then(async () => {
-    const db = await readDatabase();
-    const result = await operation(db);
-    await writeDatabase(db);
-    return result;
+export async function writeDatabase(mutator: (current: DatabaseShape) => DatabaseShape | Promise<DatabaseShape>) {
+  writeQueue = writeQueue.then(async () => {
+    const current = await readDatabase();
+    const next = await mutator(current);
+    const temp = `${DB_FILE}.tmp`;
+    await fs.writeFile(temp, JSON.stringify(next, null, 2), "utf8");
+    await fs.rename(temp, DB_FILE);
   });
 
-  writeChain = task.then(
-    () => undefined,
-    () => undefined
-  );
-
-  return task;
+  await writeQueue;
 }
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
+export async function listMonitors() {
+  const db = await readDatabase();
+  return db.monitors;
 }
 
-export async function addPurchase(input: {
-  email: string;
-  providerReference: string;
-}): Promise<PurchaseRecord> {
-  const normalizedEmail = normalizeEmail(input.email);
+export async function getMonitorById(id: string): Promise<DnsMonitor | null> {
+  const db = await readDatabase();
+  return db.monitors.find((m) => m.id === id) ?? null;
+}
 
-  return queueWrite((db) => {
-    const existing = db.purchases.find(
-      (record) =>
-        record.email === normalizedEmail && record.providerReference === input.providerReference
-    );
+export async function upsertMonitor(monitor: DnsMonitor) {
+  await writeDatabase((db) => {
+    const idx = db.monitors.findIndex((m) => m.id === monitor.id);
+    if (idx >= 0) {
+      db.monitors[idx] = monitor;
+    } else {
+      db.monitors.unshift(monitor);
+    }
+    return db;
+  });
+}
 
-    if (existing) {
-      return existing;
+export async function updateMonitor(
+  id: string,
+  updater: (existing: DnsMonitor) => DnsMonitor | null
+) {
+  let updated: DnsMonitor | null | undefined;
+
+  await writeDatabase((db) => {
+    const idx = db.monitors.findIndex((m) => m.id === id);
+    if (idx < 0) {
+      updated = undefined;
+      return db;
     }
 
-    const nextRecord: PurchaseRecord = {
-      id: randomUUID(),
-      email: normalizedEmail,
-      provider: "stripe",
-      providerReference: input.providerReference,
-      createdAt: new Date().toISOString()
-    };
-
-    db.purchases.push(nextRecord);
-    return nextRecord;
-  });
-}
-
-export async function hasPurchaseForEmail(email: string): Promise<boolean> {
-  const normalizedEmail = normalizeEmail(email);
-  const db = await readDatabase();
-  return db.purchases.some((purchase) => purchase.email === normalizedEmail);
-}
-
-export async function saveMonitorSnapshot(snapshot: MonitorSnapshot): Promise<void> {
-  await queueWrite((db) => {
-    db.snapshots[snapshot.id] = snapshot;
-  });
-}
-
-export async function getMonitorSnapshotFromDatabase(
-  monitorId: string
-): Promise<MonitorSnapshot | null> {
-  const db = await readDatabase();
-  return db.snapshots[monitorId] ?? null;
-}
-
-export async function createNotificationSubscription(input: {
-  monitorId: string;
-  email?: string;
-  discordWebhookUrl?: string;
-  thresholdPercent: number;
-}): Promise<NotificationSubscription> {
-  const email = input.email?.trim() ? normalizeEmail(input.email) : null;
-  const webhook = input.discordWebhookUrl?.trim() ? input.discordWebhookUrl.trim() : null;
-
-  return queueWrite((db) => {
-    const next: NotificationSubscription = {
-      id: randomUUID(),
-      monitorId: input.monitorId,
-      email,
-      discordWebhookUrl: webhook,
-      thresholdPercent: input.thresholdPercent,
-      createdAt: new Date().toISOString(),
-      notifiedAt: null
-    };
-
-    db.subscriptions.push(next);
-    return next;
-  });
-}
-
-export async function listSubscriptionsForMonitor(
-  monitorId: string
-): Promise<NotificationSubscription[]> {
-  const db = await readDatabase();
-  return db.subscriptions.filter((subscription) => subscription.monitorId === monitorId);
-}
-
-export async function markSubscriptionNotified(subscriptionId: string): Promise<void> {
-  await queueWrite((db) => {
-    const record = db.subscriptions.find((subscription) => subscription.id === subscriptionId);
-
-    if (record) {
-      record.notifiedAt = new Date().toISOString();
+    const next = updater(db.monitors[idx]);
+    if (!next) {
+      db.monitors.splice(idx, 1);
+      updated = null;
+      return db;
     }
+
+    db.monitors[idx] = next;
+    updated = next;
+    return db;
+  });
+
+  return updated;
+}
+
+export async function listAccessGrants() {
+  const db = await readDatabase();
+  return db.accessGrants;
+}
+
+export async function hasAccessGrant(email: string) {
+  const db = await readDatabase();
+  const lowered = email.trim().toLowerCase();
+  return db.accessGrants.some((grant) => grant.email.toLowerCase() === lowered);
+}
+
+export async function addAccessGrant(grant: AccessGrant) {
+  await writeDatabase((db) => {
+    const lowered = grant.email.toLowerCase();
+    const exists = db.accessGrants.some((item) => item.email.toLowerCase() === lowered);
+    if (!exists) {
+      db.accessGrants.unshift(grant);
+    }
+    return db;
   });
 }

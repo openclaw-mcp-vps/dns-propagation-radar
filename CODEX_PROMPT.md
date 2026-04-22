@@ -11,25 +11,27 @@ NICHE: developer-tools
 PRICE: $$12/mo
 
 ARCHITECTURE SPEC:
-A Next.js app with real-time DNS polling using server-sent events and background jobs. Frontend displays a world map with resolver status, while backend queries 40+ global nameservers every 60 seconds and triggers notifications when propagation thresholds are met.
+Next.js app with real-time DNS polling backend that queries 40+ global nameservers every 60 seconds, displays results on an interactive world map, and sends notifications when propagation thresholds are met. Uses WebSockets for live updates and background jobs for continuous monitoring.
 
 PLANNED FILES:
 - app/page.tsx
 - app/dashboard/page.tsx
-- app/api/dns-check/route.ts
-- app/api/subscribe/route.ts
+- app/api/dns/check/route.ts
+- app/api/dns/monitor/route.ts
 - app/api/webhooks/lemonsqueezy/route.ts
-- app/api/events/route.ts
-- components/dns-map.tsx
+- app/api/notifications/route.ts
+- components/dns-checker.tsx
+- components/world-map.tsx
 - components/resolver-status.tsx
-- components/notification-settings.tsx
 - lib/dns-resolvers.ts
-- lib/dns-poller.ts
+- lib/dns-query.ts
+- lib/websocket.ts
 - lib/notifications.ts
 - lib/lemonsqueezy.ts
 - lib/database.ts
+- types/dns.ts
 
-DEPENDENCIES: next, tailwindcss, prisma, @prisma/client, dns2, node-cron, nodemailer, discord.js, lemonsqueezy.js, @lemonsqueezy/lemonsqueezy.js, react-simple-maps, recharts, lucide-react, @radix-ui/react-select, @radix-ui/react-switch
+DEPENDENCIES: next, tailwindcss, dns2, ws, node-cron, nodemailer, discord.js, @lemonsqueezy/lemonsqueezy.js, prisma, @prisma/client, lucide-react, recharts, react-world-map, zod, jose
 
 REQUIREMENTS:
 - Next.js 15 with App Router (app/ directory)

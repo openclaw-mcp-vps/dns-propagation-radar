@@ -1,60 +1,55 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
-import "./globals.css";
+import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import "@/app/globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"]
+const sans = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-sans"
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"]
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono"
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://dns-propagation-radar.com"),
-  title: "DNS Propagation Radar | Live DNS Propagation Check with Global Resolver Map",
+  metadataBase: new URL("https://dnspropagationradar.com"),
+  title: "DNS Propagation Radar | DNS Propagation Check with Alerts",
   description:
-    "Check DNS propagation in real time across 40+ global resolvers. Monitor A, AAAA, CNAME, TXT, MX and NS records, then get alerted when 95% of the world catches up.",
+    "Track DNS propagation across 40+ global resolvers every minute. See live map coverage and get notified at 95% adoption.",
+  applicationName: "DNS Propagation Radar",
   keywords: [
     "dns propagation check",
-    "dns checker",
     "dns propagation",
-    "global dns lookup",
-    "dns monitoring",
-    "dns migration"
+    "dns monitor",
+    "dns alert",
+    "global dns checker"
   ],
   openGraph: {
-    type: "website",
     title: "DNS Propagation Radar",
     description:
-      "Query 40+ global resolvers every 60 seconds and watch DNS propagation on a live world map.",
-    url: "https://dns-propagation-radar.com",
-    siteName: "DNS Propagation Radar"
+      "Query 40+ global resolvers every 60 seconds and know the exact moment the internet catches up.",
+    url: "https://dnspropagationradar.com",
+    siteName: "DNS Propagation Radar",
+    type: "website"
   },
   twitter: {
     card: "summary_large_image",
     title: "DNS Propagation Radar",
     description:
-      "Live DNS propagation status across global resolvers with alerts at 95% adoption."
+      "Live DNS propagation checks with global resolver coverage and threshold alerts."
   },
-  alternates: {
-    canonical: "/"
+  robots: {
+    index: true,
+    follow: true
   }
 };
 
-export default function RootLayout({
-  children
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="dark">
-      <body
-        className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} min-h-screen bg-[#0d1117] text-zinc-100 antialiased`}
-      >
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.08),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(16,185,129,0.1),transparent_35%)]" />
+      <body className={`${sans.variable} ${mono.variable} bg-[#0d1117] font-[var(--font-sans)] text-slate-100`}>
         {children}
       </body>
     </html>

@@ -1,113 +1,61 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import crypto from "node:crypto";
 
-export interface StripeSignatureParts {
-  timestamp: string;
-  signatures: string[];
-}
-
-export interface StripeCheckoutCompletedEvent {
-  type: "checkout.session.completed";
-  data: {
-    object: {
-      id: string;
+type StripeEvent = {
+  id: string;
+  type: string;
+  data?: {
+    object?: {
+      id?: string;
       customer_email?: string;
       customer_details?: {
         email?: string;
       };
+      metadata?: {
+        email?: string;
+      };
     };
   };
+};
+
+function secureCompare(a: string, b: string) {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(left, right);
 }
 
-export interface GenericWebhookEvent {
-  type: string;
-  data?: {
-    object?: Record<string, unknown>;
-  };
-}
-
-export function parseStripeSignature(header: string): StripeSignatureParts | null {
-  const parts = header
+export function verifyStripeWebhookSignature(rawBody: string, signatureHeader: string, secret: string) {
+  const parts = signatureHeader
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
 
-  let timestamp = "";
-  const signatures: string[] = [];
+  const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2);
+  const sentSignature = parts.find((part) => part.startsWith("v1="))?.slice(3);
 
-  for (const part of parts) {
-    const [key, value] = part.split("=");
-
-    if (!key || !value) {
-      continue;
-    }
-
-    if (key === "t") {
-      timestamp = value;
-    }
-
-    if (key === "v1") {
-      signatures.push(value);
-    }
-  }
-
-  if (!timestamp || signatures.length === 0) {
-    return null;
-  }
-
-  return {
-    timestamp,
-    signatures
-  };
-}
-
-export function verifyStripeSignature(input: {
-  payload: string;
-  signatureHeader: string | null;
-  secret: string | undefined;
-}): boolean {
-  const { payload, signatureHeader, secret } = input;
-
-  if (!secret) {
-    return true;
-  }
-
-  if (!signatureHeader) {
+  if (!timestamp || !sentSignature) {
     return false;
   }
 
-  const parsed = parseStripeSignature(signatureHeader);
+  const payload = `${timestamp}.${rawBody}`;
+  const expectedSignature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
-  if (!parsed) {
-    return false;
-  }
-
-  const signedPayload = `${parsed.timestamp}.${payload}`;
-  const expected = createHmac("sha256", secret).update(signedPayload, "utf8").digest("hex");
-
-  return parsed.signatures.some((signature) => {
-    try {
-      return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-    } catch {
-      return false;
-    }
-  });
+  return secureCompare(sentSignature, expectedSignature);
 }
 
-export function extractCheckoutEmail(event: GenericWebhookEvent): string | null {
-  if (event.type !== "checkout.session.completed") {
-    return null;
-  }
-
-  const checkout = event as StripeCheckoutCompletedEvent;
-
-  return checkout.data.object.customer_details?.email ?? checkout.data.object.customer_email ?? null;
+export function parseCheckoutEmail(event: StripeEvent) {
+  const object = event.data?.object;
+  return (
+    object?.customer_email || object?.customer_details?.email || object?.metadata?.email || ""
+  )
+    .trim()
+    .toLowerCase();
 }
 
-export function extractCheckoutReference(event: GenericWebhookEvent): string | null {
-  if (event.type !== "checkout.session.completed") {
-    return null;
-  }
-
-  const checkout = event as StripeCheckoutCompletedEvent;
-  return checkout.data.object.id;
+export function parseStripeEvent(rawBody: string): StripeEvent {
+  return JSON.parse(rawBody) as StripeEvent;
 }
