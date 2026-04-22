@@ -11,27 +11,25 @@ NICHE: developer-tools
 PRICE: $$12/mo
 
 ARCHITECTURE SPEC:
-Next.js app with real-time DNS polling backend that queries 40+ global nameservers every 60 seconds, displays results on an interactive world map, and sends notifications when propagation thresholds are met. Uses WebSockets for live updates and background jobs for continuous monitoring.
+A Next.js app with real-time DNS polling that queries 40+ global nameservers every 60 seconds, displays results on an interactive world map, and sends notifications when propagation reaches 95%. Uses server-sent events for live updates and background jobs for continuous monitoring.
 
 PLANNED FILES:
 - app/page.tsx
 - app/dashboard/page.tsx
-- app/api/dns/check/route.ts
-- app/api/dns/monitor/route.ts
-- app/api/webhooks/lemonsqueezy/route.ts
-- app/api/notifications/route.ts
-- components/dns-checker.tsx
-- components/world-map.tsx
-- components/resolver-status.tsx
-- lib/dns-resolvers.ts
-- lib/dns-query.ts
-- lib/websocket.ts
+- app/api/dns-check/route.ts
+- app/api/start-monitoring/route.ts
+- app/api/webhook/lemon-squeezy/route.ts
+- app/api/sse/route.ts
+- lib/dns-resolver.ts
+- lib/nameservers.ts
 - lib/notifications.ts
-- lib/lemonsqueezy.ts
+- components/dns-map.tsx
+- components/propagation-status.tsx
+- components/pricing.tsx
 - lib/database.ts
-- types/dns.ts
+- lib/auth.ts
 
-DEPENDENCIES: next, tailwindcss, dns2, ws, node-cron, nodemailer, discord.js, @lemonsqueezy/lemonsqueezy.js, prisma, @prisma/client, lucide-react, recharts, react-world-map, zod, jose
+DEPENDENCIES: next, tailwindcss, dns2, leaflet, react-leaflet, next-auth, @lemonsqueezy/lemonsqueezy.js, prisma, @prisma/client, nodemailer, discord.js, lucide-react, recharts, zod
 
 REQUIREMENTS:
 - Next.js 15 with App Router (app/ directory)

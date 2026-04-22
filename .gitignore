@@ -1,9 +1,11 @@
-node_modules
-.next
-out
+/node_modules
+/.next
+/out
 .env
 .env.local
 .DS_Store
 npm-debug.log*
-.data/*.json
-!.data/.gitkeep
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+data/store.json

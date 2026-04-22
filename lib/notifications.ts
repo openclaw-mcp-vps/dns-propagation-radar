@@ -1,119 +1,141 @@
 import nodemailer from "nodemailer";
-import { DnsMonitor } from "@/types/dns";
+import type { MonitorJob, MonitoringSnapshot } from "@/lib/database";
 
-type NotificationPayload = {
-  title: string;
-  message: string;
-  email?: string;
-  discordWebhook?: string;
+type NotificationInput = {
+  monitor: MonitorJob;
+  snapshot: MonitoringSnapshot;
 };
 
-function canSendEmail() {
-  return Boolean(
-    process.env.SMTP_HOST &&
-      process.env.SMTP_PORT &&
-      process.env.SMTP_USER &&
-      process.env.SMTP_PASS &&
-      process.env.ALERTS_FROM_EMAIL
-  );
+type NotificationResult = {
+  channel: "email" | "discord";
+  ok: boolean;
+  detail: string;
+};
+
+function buildAlertMessage({ monitor, snapshot }: NotificationInput): string {
+  const percentage = snapshot.propagationPercent.toFixed(2);
+  return [
+    `DNS propagation reached ${percentage}% for ${monitor.domain}.`,
+    `Record type: ${monitor.recordType}`,
+    `Expected value: ${monitor.expectedValue}`,
+    `Resolvers updated: ${snapshot.resolvedCount}/${snapshot.totalResolvers}`,
+    `Monitor ID: ${monitor.id}`
+  ].join("\n");
 }
 
-async function sendEmail(to: string, subject: string, body: string) {
-  if (!canSendEmail()) {
-    return { sent: false, reason: "SMTP not configured" };
+async function sendEmailAlert(input: NotificationInput): Promise<NotificationResult> {
+  const recipient = input.monitor.notification.email;
+  if (!recipient) {
+    return {
+      channel: "email",
+      ok: false,
+      detail: "No destination email configured"
+    };
+  }
+
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT ?? "587");
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM ?? "alerts@dns-propagation-radar.com";
+
+  if (!host || !user || !pass) {
+    return {
+      channel: "email",
+      ok: false,
+      detail: "SMTP env vars are missing"
+    };
   }
 
   const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: Number(process.env.SMTP_PORT) === 465,
+    host,
+    port,
+    secure: port === 465,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
+      user,
+      pass
     }
   });
 
+  const body = buildAlertMessage(input);
+
   await transport.sendMail({
-    from: process.env.ALERTS_FROM_EMAIL,
-    to,
-    subject,
+    from,
+    to: recipient,
+    subject: `DNS propagation alert: ${input.monitor.domain}`,
     text: body
   });
 
-  return { sent: true };
+  return {
+    channel: "email",
+    ok: true,
+    detail: `Email sent to ${recipient}`
+  };
 }
 
-async function sendDiscord(webhookUrl: string, title: string, message: string) {
-  const response = await fetch(webhookUrl, {
+async function sendDiscordAlert(input: NotificationInput): Promise<NotificationResult> {
+  const configuredWebhook = input.monitor.notification.discordWebhookUrl ?? process.env.DISCORD_WEBHOOK_URL;
+
+  if (!configuredWebhook) {
+    return {
+      channel: "discord",
+      ok: false,
+      detail: "No Discord webhook configured"
+    };
+  }
+
+  const body = buildAlertMessage(input);
+  const response = await fetch(configuredWebhook, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      embeds: [
-        {
-          title,
-          description: message,
-          color: 0x3b82f6,
-          timestamp: new Date().toISOString()
-        }
-      ]
+      username: "DNS Propagation Radar",
+      content: `:satellite: ${body}`
     })
   });
 
   if (!response.ok) {
-    throw new Error(`Discord webhook failed with status ${response.status}`);
+    const detail = await response.text().catch(() => "Webhook request failed");
+    throw new Error(`Discord webhook failed with ${response.status}: ${detail}`);
   }
 
-  return { sent: true };
+  return {
+    channel: "discord",
+    ok: true,
+    detail: "Discord webhook notification sent"
+  };
 }
 
-export async function sendNotification(payload: NotificationPayload) {
-  const outcomes: Array<{ channel: string; sent: boolean; reason?: string }> = [];
+export async function sendPropagationNotifications(
+  input: NotificationInput
+): Promise<NotificationResult[]> {
+  const results: NotificationResult[] = [];
 
-  if (payload.email) {
+  if (input.monitor.notification.email) {
     try {
-      const emailResult = await sendEmail(payload.email, payload.title, payload.message);
-      outcomes.push({ channel: "email", sent: emailResult.sent, reason: emailResult.reason });
+      results.push(await sendEmailAlert(input));
     } catch (error) {
-      outcomes.push({ channel: "email", sent: false, reason: error instanceof Error ? error.message : "Email error" });
+      results.push({
+        channel: "email",
+        ok: false,
+        detail: error instanceof Error ? error.message : "Unknown email error"
+      });
     }
   }
 
-  const discordUrl = payload.discordWebhook || process.env.DISCORD_WEBHOOK_URL;
-  if (discordUrl) {
+  if (input.monitor.notification.discordWebhookUrl || process.env.DISCORD_WEBHOOK_URL) {
     try {
-      await sendDiscord(discordUrl, payload.title, payload.message);
-      outcomes.push({ channel: "discord", sent: true });
+      results.push(await sendDiscordAlert(input));
     } catch (error) {
-      outcomes.push({ channel: "discord", sent: false, reason: error instanceof Error ? error.message : "Discord error" });
+      results.push({
+        channel: "discord",
+        ok: false,
+        detail: error instanceof Error ? error.message : "Unknown Discord error"
+      });
     }
   }
 
-  if (!payload.email && !discordUrl) {
-    outcomes.push({ channel: "none", sent: false, reason: "No notification channel configured" });
-  }
-
-  return outcomes;
-}
-
-export async function sendThresholdNotification(monitor: DnsMonitor) {
-  if (!monitor.latestCheck) {
-    return;
-  }
-
-  const title = `DNS propagation reached ${monitor.latestCheck.stats.matchedPercentage}%`;
-  const lines = [
-    `Domain: ${monitor.domain}`,
-    `Record Type: ${monitor.recordType}`,
-    `Expected Value: ${monitor.expectedValue}`,
-    `Matched Resolvers: ${monitor.latestCheck.stats.matchedResolvers}/${monitor.latestCheck.stats.totalResolvers}`,
-    `Checked At: ${monitor.latestCheck.checkedAt}`,
-    `Dashboard: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard`
-  ];
-
-  await sendNotification({
-    title,
-    message: lines.join("\n"),
-    email: monitor.notification.email,
-    discordWebhook: monitor.notification.discordWebhook
-  });
+  return results;
 }

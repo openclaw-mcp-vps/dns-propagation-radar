@@ -1,39 +1,87 @@
-import { jwtVerify, SignJWT } from "jose";
-import { ACCESS_COOKIE_NAME } from "@/lib/constants";
+import crypto from "node:crypto";
+import type { NextAuthConfig } from "next-auth";
 
-function getJwtSecret() {
-  return new TextEncoder().encode(
-    process.env.STRIPE_WEBHOOK_SECRET || "local-dev-access-secret-change-me"
-  );
+export const ACCESS_COOKIE_NAME = "dnsr_access";
+
+export const nextAuthConfig: NextAuthConfig = {
+  providers: [],
+  pages: {
+    signIn: "/"
+  }
+};
+
+export type AccessPayload = {
+  email: string;
+  issuedAt: string;
+};
+
+const secret = () =>
+  process.env.ACCESS_COOKIE_SECRET ??
+  process.env.STRIPE_WEBHOOK_SECRET ??
+  "local-development-secret-change-me";
+
+function base64urlEncode(value: string): string {
+  return Buffer.from(value, "utf8").toString("base64url");
 }
 
-export async function signAccessToken(email: string) {
-  const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({ email: email.toLowerCase() })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt(now)
-    .setExpirationTime(now + 60 * 60 * 24 * 30)
-    .setIssuer("dns-propagation-radar")
-    .setAudience("dashboard")
-    .sign(getJwtSecret());
+function base64urlDecode(value: string): string {
+  return Buffer.from(value, "base64url").toString("utf8");
 }
 
-export async function verifyAccessToken(token: string) {
+function sign(value: string): string {
+  return crypto.createHmac("sha256", secret()).update(value).digest("base64url");
+}
+
+export function createAccessCookie(email: string): string {
+  const payload: AccessPayload = {
+    email: email.toLowerCase().trim(),
+    issuedAt: new Date().toISOString()
+  };
+  const encodedPayload = base64urlEncode(JSON.stringify(payload));
+  const signature = sign(encodedPayload);
+  return `${encodedPayload}.${signature}`;
+}
+
+export function verifyAccessCookie(cookieValue: string | undefined | null): AccessPayload | null {
+  if (!cookieValue) {
+    return null;
+  }
+
+  const [encodedPayload, signature] = cookieValue.split(".");
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = sign(encodedPayload);
+
+  const sigBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (sigBuffer.length !== expectedBuffer.length) {
+    return null;
+  }
+
+  if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+    return null;
+  }
+
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret(), {
-      issuer: "dns-propagation-radar",
-      audience: "dashboard"
-    });
-
-    const email = payload.email;
-    if (typeof email !== "string") {
+    const payload = JSON.parse(base64urlDecode(encodedPayload)) as AccessPayload;
+    if (!payload.email || !payload.issuedAt) {
       return null;
     }
-
-    return { email };
+    return payload;
   } catch {
     return null;
   }
 }
 
-export { ACCESS_COOKIE_NAME };
+export function accessCookieOptions() {
+  return {
+    name: ACCESS_COOKIE_NAME,
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 31
+  };
+}

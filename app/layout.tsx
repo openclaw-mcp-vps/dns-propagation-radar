@@ -1,57 +1,52 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import "leaflet/dist/leaflet.css";
 import "@/app/globals.css";
 
-const sans = Space_Grotesk({
+const headingFont = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-sans"
+  variable: "--font-heading",
+  weight: ["400", "500", "600", "700"]
 });
 
-const mono = IBM_Plex_Mono({
+const monoFont = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-mono"
+  variable: "--font-mono",
+  weight: ["400", "500", "600"]
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://dnspropagationradar.com"),
-  title: "DNS Propagation Radar | DNS Propagation Check with Alerts",
+  metadataBase: new URL("https://dns-propagation-radar.com"),
+  title: "DNS Propagation Radar | Live DNS Propagation Check",
   description:
-    "Track DNS propagation across 40+ global resolvers every minute. See live map coverage and get notified at 95% adoption.",
-  applicationName: "DNS Propagation Radar",
+    "Run a real-time dns propagation check across 40+ global resolvers, watch updates on a live map, and get notified when 95% of the world sees your new DNS value.",
   keywords: [
     "dns propagation check",
-    "dns propagation",
-    "dns monitor",
-    "dns alert",
-    "global dns checker"
+    "dns checker",
+    "global dns propagation",
+    "dns update monitor",
+    "dns migration tool"
   ],
   openGraph: {
     title: "DNS Propagation Radar",
     description:
-      "Query 40+ global resolvers every 60 seconds and know the exact moment the internet catches up.",
-    url: "https://dnspropagationradar.com",
-    siteName: "DNS Propagation Radar",
-    type: "website"
+      "Query 40 global resolvers every 60 seconds during a DNS change and see the exact moment the world catches up.",
+    type: "website",
+    url: "https://dns-propagation-radar.com"
   },
   twitter: {
     card: "summary_large_image",
     title: "DNS Propagation Radar",
     description:
-      "Live DNS propagation checks with global resolver coverage and threshold alerts."
-  },
-  robots: {
-    index: true,
-    follow: true
+      "Live DNS propagation check with a global map and 95% threshold notifications for email and Discord."
   }
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${sans.variable} ${mono.variable} bg-[#0d1117] font-[var(--font-sans)] text-slate-100`}>
-        {children}
-      </body>
+      <body className={`${headingFont.variable} ${monoFont.variable} antialiased`}>{children}</body>
     </html>
   );
 }
